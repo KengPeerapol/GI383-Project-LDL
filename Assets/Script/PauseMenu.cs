@@ -2,50 +2,63 @@ using UnityEngine;
 
 public class PauseMenu : MonoBehaviour
 {
-    [Header("ใส่ PauseMenuPanel ตรงนี้")]
+    [Header("หน้าต่าง Pause Menu")]
     public GameObject pauseMenuUI;
 
-    // เพิ่มตัวแปรนี้เพื่อเช็กว่า "ตอนนี้เกมหยุดอยู่หรือไม่?"
+    [Header("ปุ่ม Pause (หน้าจอปกติ)")]
+    public GameObject pauseButtonUI; // ⭐ เอาไว้สั่งซ่อนปุ่มตอนเกมจบ
+
     private bool isPaused = false;
 
-    // ฟังก์ชัน Update จะคอยตรวจสอบการกดปุ่มตลอดเวลา
+    // ⭐ ตัวแปรกลางที่เปิดให้สคริปต์อื่น (เลือด, เวลา) สั่งปิดระบบ Pause ได้
+    public static bool isGameOver = false;
+
+    void Start()
+    {
+        // รีเซ็ตค่าให้กด Pause ได้ปกติเมื่อเริ่มฉากใหม่
+        isGameOver = false;
+    }
+
     void Update()
     {
-        // ถ้าผู้เล่นกดปุ่ม Esc (Escape) บนคีย์บอร์ด
+        // ถ้าเกมจบแล้ว (ชนะหรือแพ้)
+        if (isGameOver)
+        {
+            // ซ่อนปุ่ม Pause บนหน้าจอทิ้งไปเลย ผู้เล่นจะได้กดไม่ได้
+            if (pauseButtonUI != null && pauseButtonUI.activeSelf)
+            {
+                pauseButtonUI.SetActive(false);
+            }
+            return; // ❌ หยุดการทำงานของโค้ดตรงนี้ (ทำให้กด Esc ไม่ได้)
+        }
+
+        // ระบบกดปุ่ม Esc ตามปกติ
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            // ถ้าเกมหยุดอยู่ -> ให้เล่นต่อ
-            if (isPaused)
-            {
-                ResumeGame();
-            }
-            // ถ้าเกมเล่นปกติอยู่ -> ให้หยุดเกม
-            else
-            {
-                PauseGame();
-            }
+            if (isPaused) ResumeGame();
+            else PauseGame();
         }
     }
 
     public void PauseGame()
     {
-        if (pauseMenuUI != null)
-        {
-            pauseMenuUI.SetActive(true);
-        }
+        if (isGameOver) return; // กันเหนียวเผื่อผู้เล่นมือไวกดตอนตายพอดี
+
+        if (pauseMenuUI != null) pauseMenuUI.SetActive(true);
+        if (pauseButtonUI != null) pauseButtonUI.SetActive(false); // ซ่อนปุ่มตอนเปิดเมนู
 
         Time.timeScale = 0f;
-        isPaused = true; // อัปเดตสถานะว่า "เกมหยุดแล้ว"
+        isPaused = true;
     }
 
     public void ResumeGame()
     {
-        if (pauseMenuUI != null)
-        {
-            pauseMenuUI.SetActive(false);
-        }
+        if (isGameOver) return;
+
+        if (pauseMenuUI != null) pauseMenuUI.SetActive(false);
+        if (pauseButtonUI != null) pauseButtonUI.SetActive(true); // โชว์ปุ่มตอนเล่นปกติ
 
         Time.timeScale = 1f;
-        isPaused = false; // อัปเดตสถานะว่า "เกมกำลังเล่นอยู่"
+        isPaused = false;
     }
 }

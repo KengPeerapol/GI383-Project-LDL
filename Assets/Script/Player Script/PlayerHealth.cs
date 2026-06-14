@@ -132,10 +132,12 @@ public class PlayerHealth : MonoBehaviour
     // ==========================================
     void Die()
     {
-        isDead = true; // อัปเดตสถานะให้ระบบรู้ว่า "ตายแล้วนะ"
-        Debug.Log("Player เลือดหมดแล้ว!");
+        isDead = true;
 
-        // สั่งเปิดระบบคัตซีนตาย (ระบบทำงานแบบหน่วงเวลา หรือ Coroutine)
+        // ⭐ เพิ่มบรรทัดนี้: แจ้งระบบ Pause ว่าเกมแพ้แล้ว ห้ามกดหยุด!
+        PauseMenu.isGameOver = true;
+
+        Debug.Log("Player เลือดหมดแล้ว!");
         StartCoroutine(DeathSequenceRoutine());
     }
 

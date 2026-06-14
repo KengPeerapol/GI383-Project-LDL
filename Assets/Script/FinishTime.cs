@@ -75,10 +75,14 @@ public class FinishTime : MonoBehaviour
         isGameEnded = true;
         IsGameWon = true;
 
+        // ⭐ เพิ่มบรรทัดนี้: แจ้งระบบ Pause ว่าเกมชนะแล้ว ห้ามกดหยุด!
+        PauseMenu.isGameOver = true;
+
         if (timerText != null)
         {
             timerText.text = "Finish!";
         }
+
 
         // ❌ เอาโค้ดปิด Spawner ตรงนี้ออกไปแล้ว เพราะเราย้ายไปทำล่วงหน้าแล้ว ❌
 
