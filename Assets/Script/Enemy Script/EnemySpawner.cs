@@ -6,8 +6,12 @@ public class EnemySpawner : MonoBehaviour
     [Header("ใส่ Prefab ศัตรูทั้งหมดที่นี่")]
     public GameObject[] enemyPrefabs;
 
-    [Header("ระยะเวลาเกิดต่อ 1 ตัว (วินาที)")]
-    public float spawnInterval = 2.5f;
+    [Header("หน่วงเวลาก่อนเริ่มเกิดตัวแรก (วินาที)")]
+    public float initialDelay = 1.0f;
+
+    [Header("ระยะเวลาเกิดแบบสุ่ม (วินาที)")]
+    public float minSpawnInterval = 1.0f; // เวลารอขั้นต่ำ
+    public float maxSpawnInterval = 3.0f; // เวลารอสูงสุด
 
     void Start()
     {
@@ -16,17 +20,24 @@ public class EnemySpawner : MonoBehaviour
 
     IEnumerator SpawnEnemyRoutine()
     {
+        // 1. หน่วงเวลาก่อนเริ่มเสกตัวแรก (เช่น กดเล่น 1 วิค่อย spawn)
+        yield return new WaitForSeconds(initialDelay);
+
         while (true)
         {
             SpawnSingleEnemy(); // เรียกฟังก์ชันเกิดศัตรูทีละตัว
-            yield return new WaitForSeconds(spawnInterval); // รอเวลาตามที่กำหนด
+
+            // 2. สุ่มเวลารอสำหรับตัวถัดไป ให้อยู่ในช่วง min ถึง max
+            float randomWaitTime = Random.Range(minSpawnInterval, maxSpawnInterval);
+
+            yield return new WaitForSeconds(randomWaitTime); // รอเวลาตามที่สุ่มได้
         }
     }
 
     void SpawnSingleEnemy()
     {
         // ดัก Error เผื่อลืมใส่ Prefab ใน Inspector
-        if (enemyPrefabs.Length == 0)
+        if (enemyPrefabs == null || enemyPrefabs.Length == 0)
         {
             Debug.LogWarning("ลืมใส่ Enemy Prefab ใน Inspector หรือเปล่าครับ!");
             return;
