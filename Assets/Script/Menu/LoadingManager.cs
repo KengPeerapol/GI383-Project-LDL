@@ -19,7 +19,7 @@ public class LoadingManager : MonoBehaviour
 
     private IEnumerator LoadMainSceneAsync()
     {
-        AsyncOperation operation = SceneManager.LoadSceneAsync("Main Scene");
+        AsyncOperation operation = SceneManager.LoadSceneAsync("GameScene");
         operation.allowSceneActivation = false;
 
         float timer = 0f;
