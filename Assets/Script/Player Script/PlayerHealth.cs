@@ -8,124 +8,105 @@ public class PlayerHealth : MonoBehaviour
     // 1. ตัวแปรตั้งค่าต่างๆ (Variables)
     // ==========================================
     [Header("ตั้งค่าเลือด")]
-    public float maxHealth = 100f;     // เลือดสูงสุดตอนเริ่มเกม
-    private float currentHealth;       // เลือดปัจจุบัน (แอบไว้ไม่ให้แก้ในหน้าต่าง Unity)
+    public float maxHealth = 100f;
+    private float currentHealth;
 
     [Header("UI หลอดเลือด")]
-    public Image hpBarFill;            // ตัวภาพหลอดเลือดที่จะให้หดสั้นลง
+    public Image hpBarFill;
 
     [Header("หน้าต่าง UI ตอนแพ้ (ลาก GameOverPanel มาใส่)")]
-    public GameObject gameOverUI;      // หน้าต่าง Game Over สีแดงที่จะเด้งขึ้นมาตอนจบ
+    public GameObject gameOverUI;
 
-    private bool isDead = false;       // สวิตช์เช็กว่า "ตอนนี้ตายหรือยัง?"
+    private bool isDead = false;
 
-    // คลังเก็บชิ้นส่วนรูปภาพทั้งหมดของตัวละคร (เอาไว้สั่งเปลี่ยนสีหรือซ่อนตัว)
+    // ⭐ จุด Optimize 1: Caching (เตรียมคอมโพเนนต์ไว้ล่วงหน้า)
+    // การเรียก GetComponent ตอนที่เกมกำลังเล่นอยู่จะกินทรัพยากรเครื่อง
+    // เราจึงสร้างตัวแปรมารับค่าไว้ตั้งแต่เริ่มเกมเลย
     private SpriteRenderer[] allSprites;
+    private PlayerController playerController;
+    private Collider2D playerCollider;
 
-    // ตัวแปรสำหรับเก็บข้อมูลสีต่างๆ ที่เราแปลงมาจากรหัส Hex
     private Color color100, color80, color60, color40, color20;
 
+    // ⭐ จุด Optimize 2: ลดขยะในหน่วยความจำ (Zero GC Allocation)
+    // ปกติคำสั่ง 'new WaitForSeconds' จะสร้างขยะใน RAM ทุกครั้งที่เรียกใช้
+    // เราจึงสร้างมันไว้ล่วงหน้าแค่ครั้งเดียว แล้วเรียกใช้ตัวแปรนี้แทน
+    private WaitForSeconds deathWaitTime = new WaitForSeconds(0.3f);
 
     // ==========================================
     // 2. การเตรียมความพร้อมตอนเริ่มเกม (Start)
     // ==========================================
     void Start()
     {
-        // เติมเลือดให้เต็มตอนเริ่มเกม
         currentHealth = maxHealth;
 
-        // ค้นหาและจดจำชิ้นส่วนรูปภาพทุกชิ้น (ทั้งสามเหลี่ยมตัวแม่ และสี่เหลี่ยมตัวลูก)
+        // ดึงคอมโพเนนต์ทั้งหมดมาเก็บไว้ในตัวแปรที่เตรียมไว้แต่แรก
         allSprites = GetComponentsInChildren<SpriteRenderer>();
+        playerController = GetComponent<PlayerController>();
+        playerCollider = GetComponent<Collider2D>();
 
-        // แปลงโค้ดสี Hex ให้กลายเป็นข้อมูลสีที่ Unity เอาไประบายได้
-        ColorUtility.TryParseHtmlString("#e9ff69", out color100); // 81 - 100 (เขียวอมเหลือง)
-        ColorUtility.TryParseHtmlString("#fff56e", out color80);  // 61 - 80  (เหลือง)
-        ColorUtility.TryParseHtmlString("#ffd869", out color60);  // 41 - 60  (เหลืองทอง)
-        ColorUtility.TryParseHtmlString("#ffaf4a", out color40);  // 21 - 40  (ส้ม)
-        ColorUtility.TryParseHtmlString("#fb5017", out color20);  // 0 - 20   (ส้มแดง)
+        ColorUtility.TryParseHtmlString("#e9ff69", out color100);
+        ColorUtility.TryParseHtmlString("#fff56e", out color80);
+        ColorUtility.TryParseHtmlString("#ffd869", out color60);
+        ColorUtility.TryParseHtmlString("#ffaf4a", out color40);
+        ColorUtility.TryParseHtmlString("#fb5017", out color20);
 
-        // อัปเดตหน้าจอ UI หลอดเลือดและสีตัวละครให้เป็นค่าเริ่มต้น
         UpdateHealthBar();
     }
-
 
     // ==========================================
     // 3. ระบบรับความเสียหายและอัปเดต UI (Take Damage)
     // ==========================================
     public void TakeDamage(float damageAmount)
     {
-        // ถ้าตายไปแล้ว ก็ให้หยุดการทำงานตรงนี้ไปเลย ไม่ต้องลดเลือดซ้ำ
         if (isDead) return;
 
-        // หักเลือดออกตามจำนวนดาเมจที่โดน
         currentHealth -= damageAmount;
 
-        // ถ้าเลือดหมด (เหลือน้อยกว่าหรือเท่ากับ 0)
         if (currentHealth <= 0)
         {
-            currentHealth = 0; // ล็อกไว้ไม่ให้เลือดติดลบ
-            Die();             // เรียกใช้งานคำสั่งตาย
+            currentHealth = 0;
+            Die();
         }
-
-        // อัปเดตหลอดเลือดและสีให้ตรงกับเลือดที่เหลืออยู่
-        UpdateHealthBar();
+        else
+        {
+            // ⭐ จุด Optimize 3: ข้ามการเปลี่ยนสีถ้าตายแล้ว
+            // สั่งให้อัปเดตสีเฉพาะตอนที่ยังรอดอยู่เท่านั้น เพราะถ้าตายเดี๋ยวตัวละครก็หายไปอยู่ดี
+            UpdateHealthBar();
+        }
     }
 
     void UpdateHealthBar()
     {
-        // ถ้ามีการใส่หลอดเลือด UI ไว้ ให้คำนวณเปอร์เซ็นต์ (เลือดปัจจุบัน / เลือดสูงสุด)
         if (hpBarFill != null)
         {
             hpBarFill.fillAmount = currentHealth / maxHealth;
         }
 
-        // เรียกฟังก์ชันเปลี่ยนสีตัวละคร
         HandlePlayerColor();
     }
-
 
     // ==========================================
     // 4. ระบบเปลี่ยนสีตามระดับเลือด (HandlePlayerColor)
     // ==========================================
     void HandlePlayerColor()
     {
-        // ถ้าหาตัวละครไม่เจอเลย ให้ข้ามไป
         if (allSprites == null || allSprites.Length == 0) return;
 
-        Color targetColor = color100; // ตั้งเป้าหมายสีเริ่มต้นเป็นสีเขียวปลอดภัย
+        Color targetColor;
 
-        // เช็กปริมาณเลือดจากน้อยไปมาก เพื่อเลือกสีที่ถูกต้อง
-        if (currentHealth <= 20f)
-        {
-            targetColor = color20;   // วิกฤต! เลือด 0 - 20 
-        }
-        else if (currentHealth <= 40f)
-        {
-            targetColor = color40;   // อันตรายมาก เลือด 21 - 40 
-        }
-        else if (currentHealth <= 60f)
-        {
-            targetColor = color60;   // อันตรายปานกลาง เลือด 41 - 60 
-        }
-        else if (currentHealth <= 80f)
-        {
-            targetColor = color80;   // เริ่มโดนโจมตี เลือด 61 - 80 
-        }
-        else
-        {
-            targetColor = color100;  // ปลอดภัย เลือด 81 - 100 
-        }
+        // ⭐ ลดทอนโค้ดให้สั้นและอ่านง่ายขึ้น โดยไม่ต้องมีปีกกา (ละไว้ในฐานที่เข้าใจ)
+        if (currentHealth <= 20f) targetColor = color20;
+        else if (currentHealth <= 40f) targetColor = color40;
+        else if (currentHealth <= 60f) targetColor = color60;
+        else if (currentHealth <= 80f) targetColor = color80;
+        else targetColor = color100;
 
-        // วนลูปเอางานสีที่ได้ ไประบายใส่ตัวละครทุกชิ้น
         foreach (SpriteRenderer sprite in allSprites)
         {
-            if (sprite != null)
-            {
-                sprite.color = targetColor;
-            }
+            if (sprite != null) sprite.color = targetColor;
         }
     }
-
 
     // ==========================================
     // 5. ระบบการตายและคัตซีน (Death Sequence)
@@ -133,9 +114,10 @@ public class PlayerHealth : MonoBehaviour
     void Die()
     {
         isDead = true;
-
-        // ⭐ เพิ่มบรรทัดนี้: แจ้งระบบ Pause ว่าเกมแพ้แล้ว ห้ามกดหยุด!
         PauseMenu.isGameOver = true;
+
+        // เคลียร์หลอดเลือดให้เป็น 0 ทันที เพื่อความสมจริงทาง UI
+        if (hpBarFill != null) hpBarFill.fillAmount = 0;
 
         Debug.Log("Player เลือดหมดแล้ว!");
         StartCoroutine(DeathSequenceRoutine());
@@ -143,42 +125,38 @@ public class PlayerHealth : MonoBehaviour
 
     private IEnumerator DeathSequenceRoutine()
     {
-        // ขั้นที่ 1: สั่งให้ PlayerController ล็อกการเคลื่อนไหว ไม่ให้ผู้เล่นกดบินต่อได้
-        PlayerController controller = GetComponent<PlayerController>();
-        if (controller != null) controller.TriggerDeath();
+        // ⭐ ใช้คอมโพเนนต์ที่เก็บไว้ (Caching) แทนการเรียก GetComponent ใหม่
+        if (playerController != null) playerController.TriggerDeath();
 
-        // ขั้นที่ 2: เอฟเฟกต์สั่น (Shake Effect) เป็นเวลา 1 วินาที
         float shakeDuration = 1f;
         float elapsed = 0f;
-        Vector3 originalPos = transform.position; // จำตำแหน่งเดิมไว้ก่อนสั่น
+        Vector3 originalPos = transform.position;
 
         while (elapsed < shakeDuration)
         {
-            // สุ่มขยับแกน X และ Y แบบรวดเร็ว ทำให้ดูเหมือนการสั่นสะเทือน
             float x = originalPos.x + Random.Range(-0.2f, 0.2f);
             float y = originalPos.y + Random.Range(-0.2f, 0.2f);
             transform.position = new Vector3(x, y, originalPos.z);
 
-            elapsed += Time.deltaTime; // นับเวลาเดินหน้า
-            yield return null;         // รอให้เฟรมนี้จบ แล้วค่อยกลับไปสั่นใหม่ในเฟรมหน้า
+            elapsed += Time.deltaTime;
+            yield return null;
         }
 
-        transform.position = originalPos; // ดึงตัวละครกลับมาตำแหน่งเดิมให้เรียบร้อย
+        transform.position = originalPos;
 
-        // ขั้นที่ 3: ระเบิดหายไป (ซ่อนรูปภาพและปิดกล่องชน แทนการใช้ SetActive(false) เพื่อไม่ให้สคริปต์นี้หยุดทำงาน)
         foreach (SpriteRenderer sprite in allSprites)
         {
             if (sprite != null) sprite.enabled = false;
         }
-        GetComponent<Collider2D>().enabled = false;
 
-        // ขั้นที่ 4: หยุดรอให้ฉากว่างเปล่าอีก 2 วินาที (เพื่อให้ผู้เล่นซึมซับการตาย)
-        yield return new WaitForSeconds(0.3f);
+        // ⭐ ใช้คอมโพเนนต์ Collider ที่เก็บไว้ (Caching) มาสั่งปิด
+        if (playerCollider != null) playerCollider.enabled = false;
 
-        // ขั้นที่ 5: เด้งหน้าจอ Game Over ขึ้นมา
+        // ⭐ จุด Optimize: ใช้เวลารอที่เตรียมไว้แล้วแต่ต้น (No GC)
+        yield return deathWaitTime;
+
         if (gameOverUI != null) gameOverUI.SetActive(true);
 
-        // ขั้นที่ 6: หยุดเวลาทั้งหมดในเกมอย่างสมบูรณ์
         Time.timeScale = 0f;
     }
 }

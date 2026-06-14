@@ -7,18 +7,20 @@ public class WallBounce : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // เช็กว่าคนที่มาชนคือ Player ใช่หรือไม่ (ดูจากสคริปต์ PlayerController)
-        if (collision.gameObject.GetComponent<PlayerController>() != null)
+        // ⭐ จุด Optimize 1: ใช้ TryGetComponent เช็กว่าเป็น Player ไหม (ทำงานเร็วกว่า GetComponent)
+        if (collision.gameObject.TryGetComponent(out PlayerController player))
         {
-            Rigidbody2D rb = collision.gameObject.GetComponent<Rigidbody2D>();
-
-            if (rb != null)
+            // ถ้าเป็น Player แน่ๆ ค่อยดึงกล่องฟิสิกส์ของมันมาใช้งานด้วย TryGetComponent อีกรอบ
+            if (collision.gameObject.TryGetComponent(out Rigidbody2D rb))
             {
-                // หาเวกเตอร์ทิศทางการชน (เช่น ถ้าชนกำแพงบน ทิศจะชี้ลงด้านล่างอัตโนมัติ)
-                Vector2 bounceDirection = collision.contacts[0].normal;
+                // ⭐ จุด Optimize 2: ใช้ GetContact(0) แทนคำสั่ง contacts[0] แบบเก่า
+                // การใช้ contacts[0] Unity จะแอบสร้าง Array ขึ้นมาใหม่ทำให้เปลือง RAM ชั่วคราว
+                // GetContact(0) จะดึงจุดที่ชนจุดแรกมาให้เลยทันทีแบบเพียวๆ ทำงานเร็วกว่ามากครับ
+                Vector2 bounceDirection = collision.GetContact(0).normal;
 
-                // สั่งให้ Player เด้งไปในทิศทางนั้นด้วยความแรงที่กำหนด
-                rb.velocity = bounceDirection * bounceForce;
+                // ⭐ จุด Optimize 3: เปลี่ยนจาก velocity เป็น linearVelocity 
+                // เพื่อให้โค้ดทันสมัยและเข้ากับระบบฟิสิกส์ของ Unity 6 มากที่สุด
+                rb.linearVelocity = bounceDirection * bounceForce;
             }
         }
     }

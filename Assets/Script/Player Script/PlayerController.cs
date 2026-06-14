@@ -16,9 +16,16 @@ public class PlayerController : MonoBehaviour
     private Rigidbody2D rb;
     private bool canControl = true;
     private bool isWinning = false;
-
-    // ⭐ ตัวแปรใหม่: เช็กว่าตายหรือยัง
     private bool isDead = false;
+
+    // ⭐ ตัวแปรใหม่สำหรับรับค่าคลิกค้างจาก Update ไปใช้ใน FixedUpdate
+    private bool isFlapping = false;
+
+    // ⭐ จุด Optimize 1: สร้างตัวแปรเช็กสถานะรวม ช่วยลดความยาวของ if
+    // IsActive = สถานะปกติ (ยังไม่ตาย และ ยังไม่จบเกม)
+    private bool IsActive => !isWinning && !isDead;
+    // CanFly = บังคับได้ (สถานะปกติ และ ไม่ติดสตัน)
+    private bool CanFly => IsActive && canControl;
 
     void Start()
     {
@@ -28,8 +35,11 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        // ถ้าตายแล้ว หรือกำลังอยู่ในฉากจบ ไม่ต้องหมุนตัว
-        if (!isWinning && !isDead)
+        // ⭐ จุด Optimize 2: ย้ายการเช็ก Input มาไว้ใน Update เสมอ ป้องกันการกดไม่ติด
+        isFlapping = Input.GetMouseButton(0);
+
+        // ถ้าอยู่ในสถานะปกติ (ไม่ตาย/ไม่จบฉาก) ให้หมุนตัวได้
+        if (IsActive)
         {
             HandleRotationSmooth();
         }
@@ -37,8 +47,8 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // จะบินได้ต้อง ควบคุมได้, ไม่ชนะ, และ ไม่ตาย
-        if (Input.GetMouseButton(0) && canControl && !isWinning && !isDead)
+        // ⭐ จุด Optimize 3: การออกแรงฟิสิกส์ยังคงต้องอยู่ใน FixedUpdate เหมือนเดิม
+        if (isFlapping && CanFly)
         {
             FlyUp();
         }
@@ -46,12 +56,13 @@ public class PlayerController : MonoBehaviour
 
     void FlyUp()
     {
-        rb.velocity = new Vector2(0, flyForce);
+        // เปลี่ยนมาใช้ linearVelocity ให้เป็นมาตรฐาน Unity 6
+        rb.linearVelocity = new Vector2(0, flyForce);
     }
 
     public void ApplyStun(float duration)
     {
-        if (isDead) return; // ถ้าตายแล้วไม่ต้องติดสตันซ้ำ
+        if (isDead) return;
         StartCoroutine(StunRoutine(duration));
     }
 
@@ -66,8 +77,9 @@ public class PlayerController : MonoBehaviour
     {
         float targetAngle;
 
-        if (rb.velocity.y > 0.1f) targetAngle = baseRotationZ + tiltUpwardOffset;
-        else if (rb.velocity.y < -0.1f) targetAngle = baseRotationZ + tiltDownwardOffset;
+        // อัปเดตมาใช้ linearVelocity เหมือนกัน
+        if (rb.linearVelocity.y > 0.1f) targetAngle = baseRotationZ + tiltUpwardOffset;
+        else if (rb.linearVelocity.y < -0.1f) targetAngle = baseRotationZ + tiltDownwardOffset;
         else return;
 
         Quaternion targetRotation = Quaternion.Euler(0, 0, targetAngle);
@@ -80,17 +92,18 @@ public class PlayerController : MonoBehaviour
         canControl = false;
         rb.gravityScale = 0f;
         transform.rotation = Quaternion.Euler(0, 0, baseRotationZ);
-        rb.velocity = new Vector2(5f, 0f);
+
+        // ใช้ linearVelocity สำหรับพุ่งไปข้างหน้า
+        rb.linearVelocity = new Vector2(5f, 0f);
     }
 
-    // ⭐ ฟังก์ชันใหม่: เรียกใช้ตอนเลือดหมด
     public void TriggerDeath()
     {
         isDead = true;
         canControl = false;
 
-        // หยุดการเคลื่อนที่ทั้งหมด ลอยนิ่งๆ กลางอากาศเพื่อเตรียมสั่น
-        rb.velocity = Vector2.zero;
+        // ใช้ linearVelocity สำหรับหยุดนิ่ง
+        rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 0f;
     }
 }

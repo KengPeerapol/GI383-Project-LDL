@@ -11,21 +11,24 @@ public class WallDamage : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // 1. จัดการเรื่องลดเลือด
-        PlayerHealth playerHealth = collision.gameObject.GetComponent<PlayerHealth>();
-        if (playerHealth != null)
+        // ⭐ จุด Optimize 1: ใช้ TryGetComponent เพื่อเช็กว่าเป็นผู้เล่นหรือไม่ (เร็วกว่าแบบเดิม)
+        // ถ้าสิ่งที่พุ่งมาชน "มี" สคริปต์ PlayerHealth แปลว่าเป็นผู้เล่นแน่นอน โค้ดถึงจะยอมเข้าไปทำคำสั่งด้านใน
+        if (collision.gameObject.TryGetComponent(out PlayerHealth playerHealth))
         {
+            // 1. จัดการเรื่องลดเลือดทันที
             playerHealth.TakeDamage(damage);
-        }
 
-        // 2. จัดการเรื่องเสียการควบคุม
-        if (canStunPlayer) // ถ้ากำแพงนี้ตั้งค่าให้สตันได้
-        {
-            PlayerController playerCtrl = collision.gameObject.GetComponent<PlayerController>();
-            if (playerCtrl != null)
+            // 2. จัดการเรื่องเสียการควบคุม
+            // ⭐ จุด Optimize 2: เช็กตัวแปร bool ก่อนเลย! 
+            // ถ้ากำแพงนี้ไม่ได้ติ๊กถูก canStunPlayer โค้ดก็จะไม่ต้องเสียเวลาไปดึงสคริปต์ PlayerController ให้เหนื่อยฟรีๆ
+            if (canStunPlayer)
             {
-                // สั่งให้ Player เสียการควบคุมตามเวลาที่ตั้งไว้
-                playerCtrl.ApplyStun(stunDuration);
+                // ดึงสคริปต์บังคับตัวละคร (ดึงเฉพาะตอนที่จะสตันจริงๆ)
+                if (collision.gameObject.TryGetComponent(out PlayerController playerCtrl))
+                {
+                    // สั่งให้ Player เสียการควบคุมตามเวลาที่ตั้งไว้
+                    playerCtrl.ApplyStun(stunDuration);
+                }
             }
         }
     }
